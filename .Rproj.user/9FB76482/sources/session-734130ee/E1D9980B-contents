@@ -1,0 +1,214 @@
+---
+title: "Exercise 11/12"
+author: "Kelbi Hall"
+date: "March 12,2025"
+format: 
+  html:
+    self-contained: true
+
+---
+Part 1: Normality Testing
+
+```{r}
+?airquality 
+```
+
+
+```{r}
+str(airquality) 
+summary(airquality)  
+head(airquality)  
+```
+
+
+```{r}
+shapiro.test(na.omit(airquality$Ozone))   
+shapiro.test(na.omit(airquality$Solar.R))
+shapiro.test(na.omit(airquality$Wind))
+shapiro.test(na.omit(airquality$Temp))
+
+```
+
+What is the purpose of the Shapiro-Wilk test?
+
+The test determinds if the data has a normal distribution or not, which is imporant because we know if we can use statstical test like t-tests that assumes normaility. 
+
+
+What are the null and alternative hypotheses for this test?
+
+The null hypothesis for this test is that the data is normally disrrbuted, while the alternative hypothesis is that the data is not normally distributed.
+
+Interpret the p-values. Are these variables normally distributed?
+
+Ozone: Not normally distributed 
+Temp: Not normally distributed 
+Solar: Not normally distributed 
+Wind: Normally distributed 
+
+Part 2: Data Transformation and Feature Engineering
+
+
+```{r}
+library(dplyr)
+
+airquality <- airquality %>%
+  mutate(Season = case_when(
+    Month %in% c(11, 12, 1) ~ "Winter",
+    Month %in% c(2, 3, 4) ~ "Spring",
+    Month %in% c(5, 6, 7) ~ "Summer",
+    Month %in% c(8, 9, 10) ~ "Fall"
+  ))
+
+head(airquality)
+```
+
+```{r}
+table(airquality$Season)
+
+```
+
+
+
+Part 3: Data Preprocessing
+```{r}
+library(tidymodels)
+library(dplyr)
+
+```
+
+```{r}
+data("airquality")
+
+airquality_recipe <- recipe(~ Temp + Solar.R + Wind, data = airquality) %>%
+  step_impute_mean(all_numeric_predictors()) %>%  
+  step_normalize(all_numeric_predictors())  
+
+prepped_recipe <- prep(airquality_recipe)
+
+normalized_data <- bake(prepped_recipe, new_data = airquality)
+
+
+head(normalized_data)
+
+```
+```{r}
+
+data("airquality")
+
+airquality <- airquality %>%
+  mutate(Season = case_when(
+    Month %in% c(11, 12, 1) ~ "Winter",
+    Month %in% c(2, 3, 4) ~ "Spring",
+    Month %in% c(5, 6, 7) ~ "Summer",
+    Month %in% c(8, 9, 10) ~ "Fall"
+  ))
+
+airquality_recipe <- recipe(~ Temp + Solar.R + Wind + Season, data = airquality) %>%
+  step_impute_mean(all_numeric_predictors()) %>%  
+  step_normalize(all_numeric_predictors()) %>%  
+  step_dummy(Season, one_hot = TRUE)  
+
+
+prepped_recipe <- prep(airquality_recipe)
+
+processed_data <- bake(prepped_recipe, new_data = airquality)
+
+
+head(processed_data)
+
+```
+```{r}
+
+head(processed_data)
+
+colnames(processed_data)
+
+summary(processed_data)
+
+```
+Why normalize data?
+To be able to use satistical test and have an accurate model
+
+Function for mean imputation?	
+
+step_impute_mean(all_numeric_predictors())
+
+Why use both prep() and bake()?	
+prep() learns transformations, while bake() applies them to the dataset.
+
+
+Part 4: Building a Linear Regression Model
+
+
+```{r}
+data("airquality")
+
+airquality_clean <- airquality %>%
+  drop_na(Ozone)  
+
+lm_model <- lm(Ozone ~ ., data = airquality_clean)
+
+
+summary(lm_model)
+
+r_squared <- summary(lm_model)$r.squared
+adj_r_squared <- summary(lm_model)$adj.r.squared
+
+
+coefficients_table <- summary(lm_model)$coefficients
+
+```
+Interpret the model summary output (coefficients, R-squared, p-values) in plain language
+
+R-squared- 62.49% of the variation in Ozone levels, while the adjusted R-squared is 60.71% is slightly lower because it adjusts for multiple predictors.
+
+The model does a good job at predicting Ozone levels, but around 37% of the variation is still unexplained .
+
+
+Part 5: Model Diagnostics
+
+```{r}
+
+library(tidymodels)
+library(ggpubr)
+library(broom)
+library(ggplot2)
+library(dplyr)
+
+data("airquality")
+
+airquality_clean <- airquality %>%
+  drop_na(Ozone, Solar.R, Wind, Temp, Month, Day)
+
+lm_model <- lm(Ozone ~ ., data = airquality_clean)
+
+model_data <- augment(lm_model, data = airquality_clean)
+
+head(model_data)
+
+hist_residuals <- ggplot(model_data, aes(.resid)) +
+  geom_histogram(bins = 30, fill = "skyblue", color = "black") +
+  theme_minimal() +
+  labs(title = "Histogram of Residuals", x = "Residuals", y = "Count")
+
+qq_residuals <- ggplot(model_data, aes(sample = .resid)) +
+  stat_qq() +
+  stat_qq_line() +
+  theme_minimal() +
+  labs(title = "QQ Plot of Residuals")
+
+ggarrange(hist_residuals, qq_residuals, ncol = 2, nrow = 1)
+
+ggscatter(model_data, x = "Ozone", y = ".fitted",
+          add = "reg.line", conf.int = TRUE,
+          cor.coef = TRUE, cor.method = "spearman",
+          ellipse = TRUE) +
+  labs(title = "Actual vs. Predicted Ozone Levels",
+       x = "Actual Ozone",
+       y = "Predicted Ozone")
+
+```
+
+
+
+
